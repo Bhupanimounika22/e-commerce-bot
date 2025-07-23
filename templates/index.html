@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Chatbot Data Analyst</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      margin: 0;
+      padding: 20px;
+      background: #f2f6fa;
+    }
+
+    .container {
+      background: #fff;
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+      max-width: 800px;
+      margin: auto;
+    }
+
+    h1 {
+      color: #2c3e50;
+      text-align: center;
+      font-size: 1.8rem;
+    }
+
+    input[type="text"] {
+      width: 100%;
+      padding: 10px;
+      font-size: 1.1em;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      margin-bottom: 15px;
+    }
+
+    button {
+      padding: 10px 16px;
+      font-size: 1em;
+      margin: 6px 5px 6px 0;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+
+    button:hover {
+      opacity: 0.9;
+    }
+
+    button:nth-child(2) { background: #2980b9; color: white; }
+    button:nth-child(3) { background: #27ae60; color: white; }
+    button:nth-child(4) { background: #f1c40f; color: black; }
+    button:nth-child(5) { background: #e74c3c; color: white; }
+
+    #thinking {
+      display: none;
+      color: #2980b9;
+      font-weight: bold;
+      margin-top: 10px;
+    }
+
+    pre {
+      background: #f8f8f8;
+      padding: 12px;
+      border-radius: 8px;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .label {
+      font-weight: bold;
+      color: #2c3e50;
+      margin-top: 20px;
+      font-size: 1.1em;
+    }
+
+    .toggle {
+      margin: 10px 0;
+    }
+
+    .section-box {
+      padding: 10px;
+      border-radius: 8px;
+      margin-top: 15px;
+      display: none;
+    }
+
+    #schema-box {
+      background: #e6f2ff;
+      border: 1px solid #99c2ff;
+    }
+
+    #diagnostics-box {
+      background: #fffbe6;
+      border: 1px solid #ffe066;
+    }
+
+    #data-issues-box {
+      background: #ffe6e6;
+      border: 1px solid #ff9999;
+    }
+
+    #test-sql-box {
+      background: #eafaf1;
+      border: 1px solid #2ecc71;
+    }
+
+    textarea {
+      width: 100%;
+      font-family: monospace;
+      padding: 10px;
+      border-radius: 6px;
+      margin-top: 8px;
+      border: 1px solid #ccc;
+    }
+
+    #user-message {
+      color: #c0392b;
+      font-weight: bold;
+      margin-top: 10px;
+    }
+
+    @media (max-width: 600px) {
+      .container {
+        padding: 20px;
+      }
+
+      button {
+        width: 100%;
+        margin-bottom: 10px;
+      }
+
+      input[type="text"] {
+        font-size: 1em;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Ask a Question About Your Dataset</h1>
+    <input id="question" type="text" placeholder="Type your question..." />
+    <button onclick="askQuestion()">Ask</button>
+   
+
+    <div class="toggle">
+      <input type="checkbox" id="stream" checked />
+      <label for="stream">Stream LLM response (live typing)</label>
+    </div>
+
+    <div id="thinking">Thinking...</div>
+    <div id="user-message"></div>
+
+    <div class="label">SQL Query:</div>
+    <pre id="sql"></pre>
+
+  
+
+    <div id="schema-box" class="section-box"></div>
+    <div id="diagnostics-box" class="section-box"></div>
+    <div id="data-issues-box" class="section-box"></div>
+
+    <div id="test-sql-box" class="section-box" style="display:block;">
+      <div class="label">Test SQL (run any query):</div>
+      <textarea id="test-sql" rows="3"></textarea>
+      <button onclick="runTestSQL()" style="background:#1abc9c; color:white;">Run SQL</button>
+      <pre id="test-sql-result"></pre>
+    </div>
+  </div>
+
+  <script>
+    async function askQuestion() {
+      document.getElementById('thinking').style.display = 'block';
+      document.getElementById('sql').innerText = '';
+     
+      document.getElementById('user-message').innerText = '';
+
+      const question = document.getElementById('question').value;
+      const stream = document.getElementById('stream').checked;
+
+      if (stream) {
+        const response = await fetch('/ask', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ question, stream: true }),
+        });
+
+        const reader = response.body.getReader();
+        let sql = '';
+        const decoder = new TextDecoder();
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          sql += decoder.decode(value);
+          document.getElementById('sql').innerText = sql;
+        }
+
+        document.getElementById('thinking').style.display = 'none';
+
+        const answerResp = await fetch('/ask', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ question, stream: false }),
+        });
+
+        const answerData = await answerResp.json();
+        document.getElementById('answer').innerText = JSON.stringify(answerData.answer, null, 2);
+        if (answerData.user_message) {
+          document.getElementById('user-message').innerText = answerData.user_message;
+        }
+      } else {
+        const response = await fetch('/ask', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ question, stream: false }),
+        });
+        const data = await response.json();
+        document.getElementById('sql').innerText = data.sql;
+        document.getElementById('answer').innerText = JSON.stringify(data.answer, null, 2);
+        if (data.user_message) {
+          document.getElementById('user-message').innerText = data.user_message;
+        }
+        document.getElementById('thinking').style.display = 'none';
+      }
+    }
+
+     
+    async function runTestSQL() {
+      const sql = document.getElementById('test-sql').value;
+      const resultBox = document.getElementById('test-sql-result');
+      resultBox.innerText = 'Running...';
+      const response = await fetch('/test_sql', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sql }),
+      });
+      const data = await response.json();
+      if (data.error) {
+        resultBox.innerText = 'Error: ' + data.error;
+      } else if (data.result && data.result.length === 0) {
+        resultBox.innerText = 'No results found.';
+      } else {
+        resultBox.innerText = JSON.stringify(data.result, null, 2);
+      }
+    }
+  </script>
+</body>
+</html>

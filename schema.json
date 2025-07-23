@@ -1,0 +1,5 @@
+{
+  "ad_sales": ["date", "item_id", "ad_sales", "impressions", "ad_spend", "clicks", "units_sold"],
+  "total_sales": ["date", "item_id", "total_sales", "total_units_ordered"],
+  "eligibility": ["eligibility_datetime_utc", "item_id", "eligibility", "message"]
+}
