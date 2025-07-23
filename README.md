@@ -18,7 +18,7 @@ This project is an AI-powered chatbot for querying and analyzing e-commerce data
    ```
 3. **Install dependencies**
    ```sh
-   pip install flask flask_cors requests
+   pip install -r requirements.txt
    ```
 4. **Import your data**
    - Place your CSVs in the `data/` folder.
